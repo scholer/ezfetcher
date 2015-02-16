@@ -44,9 +44,18 @@ def credentials_prompt(user='', password=''):
 
 
 def load_config(filepath=None):
-    """ Load config from file. """
+    """
+    Load config from file:
+        Default path: "~/.config/ezfetcher/ezfetcher.yaml"
+        Other paths:
+            "~/.ezfetcher.yaml"
+            "~/.ezfetcher/ezfetcher.yaml"
+            "~/.config/ezfetcher.yaml"
+            "~/.config/ezfetcher/config.yaml"
+    """
     if filepath is None:
-        filepath = os.path.expanduser("~/.ezfetcher.yaml")
+        filepath = os.path.expanduser("~/.config/ezfetcher/ezfetcher.yaml")
+    filepath = os.path.normpath(filepath)
     try:
         config = yaml.load(open(filepath))
         logger.debug("Config with %s keys loaded from file: %s", len(config), filepath)
@@ -69,27 +78,28 @@ def get_config(args=None, config_fpath=None):
     # Merge with args:
     if isinstance(args, argparse.Namespace):
         args = args.__dict__
-    for key, value in args:
+    for key, value in args.items():
         if value is not None:
             config[key] = value
-    logger.debug("Returning config merged with args...")
+    logger.debug("Returning merged config with args, has %s keys", len(config))
     return config
 
-def init_logging(args=None, prefix="EzFetcher"):
+def init_logging(args=None):#, prefix="EzFetcher"):
     """
     Set up standard logging system based on values provided by argsns, namely:
     - loglevel
     - logtofile
     - testing
     """
-
+    if args is None:
+        args = {}
     loguserfmt = "%(asctime)s %(levelname)-5s %(name)20s:%(lineno)-4s%(funcName)20s() %(message)s"
     logtimefmt = "%H:%M:%S" # Nicer for output to user in console and testing.
-    if 'loglevel' in args:
+    if args.get('loglevel'):
         try:
             loglevel = int(args['loglevel'])
-        except ValueError:
-            loglevel = getattr(logging, args['loglevel'])
+        except (TypeError, ValueError):
+            loglevel = getattr(logging, args['loglevel'].upper())
     else:
         loglevel = logging.DEBUG if args.get('testing') else logging.INFO
 
@@ -99,3 +109,4 @@ def init_logging(args=None, prefix="EzFetcher"):
                         # filename='example.log',
                         #)
     logger.info("Logging system initialized with loglevel %s", loglevel)
+    print("args:", args)

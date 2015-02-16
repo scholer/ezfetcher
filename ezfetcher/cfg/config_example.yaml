@@ -1,0 +1,16 @@
+#ezfetcher config parameters:
+cookies_snatch_from: chrome                     # Obtain/extract cookies from this browser.
+cookie_snatch_domain: ez.statsbiblioteket.dk    # The domain used to obtain cookies.
+cookie_snatch_domain: [sbez]                    # The keys to extract.
+ezclient_headers: null                          # Dict with headers to pass to the session object.
+ezclient_cookies: null                          # Dict with cookies to pass to the session object.
+ezclient_login_adaptor: AU_lib                  # The named login adaptor that ezclient should use.
+ezclient_useragent: null                        # User-Agent to use (can also be provided in the header).
+# All pdf_* cfg keys are used by the pdffetcher module:
+pdf_download_dir: ~/Downloads                   # Download folder for pdf files.
+pdf_href_regex: '<a .*?href="([^\s]+\.pdf)"'    # Regex used to get possible pdf links in html
+pdf_open_after_download: True                   # Open pdf files after download.
+# Format string specifying how a url should be rewritten:
+proxy_url_fmt: https://{netloc}.ez.statsbiblioteket.dk:2048{path}
+proxy_enabled_domains: null                     # List of domains that should be proxied. If provided, it is assumed that all other domains *should not* be proxied.
+proxy_ignore_domains: null                      # List of domains NOT to proxy.

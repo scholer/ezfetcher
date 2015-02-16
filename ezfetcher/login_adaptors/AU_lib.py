@@ -22,8 +22,9 @@ import re
 import requests
 from urllib.parse import urlparse, urljoin, parse_qsl
 from getpass import getpass
+import logging
+logger = logging.getLogger(__name__)
 
-#s = requests.Session()
 
 
 def print_history(response, name):
@@ -64,17 +65,23 @@ def select_login_page(s, url, url_is_loginpage=True):
 
 ## IT WORKS, bitches!
 
+def get_au_lib_credentials(inputfields=None, header="AU Library login:"):
+    if inputfields is None:
+        inputfields = (('username', 'CPR nummer', getpass),
+                       ('password', 'PIN', getpass))
+    formdata = {}
+    print(header)
+    for field, description, prompt_func in inputfields:
+        formdata[field] = prompt_func("Please enter %s:  " % description)
+    return formdata
+
+
 def submit_lib_credentials(s, url):
     # AuthState is same as the AuthState you get from url with
     params = dict(parse_qsl(urlparse(url).query))
     action_url = url.split('?')[0]
     #
-    inputfields = (('username', 'CPR nummer', getpass),
-                   ('password', 'PIN', getpass))
-    formdata = {}
-    print("AU Library login:")
-    for field, description, prompt in inputfields:
-        formdata[field] = prompt("Please enter %s:" % description)
+    formdata = get_au_lib_credentials()
     params.update(formdata)
     # <form name="loginform" id="loginform" action="?" method="post">
     r3 = s.post(action_url, data=params)
@@ -127,3 +134,8 @@ def AU_lib_login(s, url, url_is_loginpage=None):
     #r2 = s.get(url2)
     # And yes, I can now use my session to download other stuff via ez.statsbiblioteket.dk:2048 :)
     return r
+
+
+def test():
+    pass
+    #s = requests.Session()
