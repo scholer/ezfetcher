@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 #except ImportError as e:
 #    logger.warning("ezfetcher.pdffetcher: %s - cookie_snatch_from will not function.", e)
 from .utils import get_config, init_logging
+from .utils import filehexdigest, calc_checksum
 #from .url_proxy_utils import proxy_url_rewrite
 #from .errors import LoginRedirectException
 from .ezclient import EzClient
@@ -112,26 +113,55 @@ def resolve_pdf_href(html_url, pdf_href):
 
 
 
-def save_file(response, filepath, ensure_unique=True):
+def save_file(response, filepath, overwrite="check_digest",
+              metadata=None, filename_fmt=None):
     """
     Save the content from <response> to <filepath>.
     If filepath is a directory, save to a file in filepath,
     using the basename from the response URL.
     If <ensure_unique> is True, existing files will not be overwritten.
     Instead, a new, unique, filename is generated. If this fails,
+    Overwrite controls behaviour if file already exists:
+     a) "check_digest" (default) will calculate checksum/digest of response and existing file.
+        If they are identical, the existing file's path is returned.
+     b) "never" or False: Never overwrite, create unique new filename instead.
+     c) "
 
     """
+    if overwrite is None:
+        overwrite = "check_digest"
+    r_checksum = calc_checksum(response.content)
     if os.path.isdir(filepath):
         fname = urlparse(response.url).path.rsplit('/', 1)[-1]
-        filepath = os.path.join(filepath, fname)
+        if filename_fmt is None:
+            filepath = os.path.join(filepath, fname)
+        else:
+            generate_filename(filename_fmt, metadata)
     elif not os.path.isdir(os.path.dirname(filepath)):
         raise ValueError("filepath in non-existing directory: %s " % filepath)
-    if ensure_unique:
-        filepath = get_unique_filename(filepath)
+    if os.path.exists(filepath):
+        if overwrite.lower() == "check_digest":
+            f_checksum = filehexdigest(filepath)
+            if r_checksum == f_checksum:
+                # Response pdf is same as the one on disk:
+                print("Checksum of pdf response MATCHES checksum of existing pdf on disk:\n%s\n  %s\n  %s\n" % \
+                      (filepath, r_checksum, f_checksum))
+                return filepath
+            else:
+                print("Checksum of pdf response DIFFER FROM checksum of existing pdf on disk:\n%s\n  %s\n  %s\n" % \
+                      (filepath, r_checksum, f_checksum))
+                overwrite = False
+        if not overwrite or overwrite == "never":
+            filepath = get_unique_filename(filepath)
     print("Saving %s to file %s" % (response.url, filepath))
     with open(filepath, 'wb') as fd:
         fd.write(response.content) # maybe iter_content() ?
     return filepath
+
+def generate_filename(filename_fmt, metadata):
+    """
+    """
+    raise NotImplementedError("generate_filename not implemented; will implement when needed...")
 
 def get_unique_filename(filename, max_iterations=1000, unique_fmt="{fnroot} ({i}){ext}"):
     """ Returns a unique filename based on <filename> and unique_fmt. """
@@ -180,7 +210,7 @@ def get_pdf_response(url, session, pdf_href_regex, recursions=4, r=None):
 
 
 
-def fetch_pdf(url, config, ezclient=None, headers=None, cookies=None, r=None):
+def fetch_pdf(url, config, ezclient=None, headers=None, cookies=None, r=None, metadata=None):
     """
     Fetch pdf from url.
     You can provide *either* a client to use, OR headers/cookies OR neither.
@@ -210,16 +240,22 @@ def fetch_pdf(url, config, ezclient=None, headers=None, cookies=None, r=None):
 
     print("Response with content type:", response.headers['Content-Type'])
     # We have a pdf in our response:
+    logger.info("Response from %s is: %s", response.url, response)
     if response and response.content:
         logger.info("Response with %s bytes obtained from %s", len(response.content), response.url)
         logger.info("config.get('pdf_download_dir'): %s", config.get('pdf_download_dir'))
         savedir = os.path.expanduser(config.get('pdf_download_dir', os.path.join('~', 'Downloads')))
         savedir = os.path.normpath(savedir)
-        filepath = save_file(response, savedir) # This may overwrite file if already exist..
-        if config.get('pdf_open_after_download'):
+        # TODO: If filename already exists, do checksum calculation to detect identical file.
+        filepath = save_file(response, savedir, overwrite=config.get('pdf_overwrite', 'check_digest'),
+                             metadata=metadata)
+        open_pdf = config.get('pdf_open_after_download')
+        if open_pdf == "ask":
+            ok = input("Open pdf in browser? [yes/no] ")
+            open_pdf = (bool(ok) and ok[0].lower() == 'y')
+        if open_pdf:
             webbrowser.open(filepath)
         return filepath
-    logger.info("Response from %s is: %s", response.url, response)
 
 
 

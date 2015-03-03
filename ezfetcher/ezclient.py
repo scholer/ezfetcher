@@ -101,12 +101,13 @@ class EzClient(object):
         """
         Args headers and cookies overrides ezclient_headers/cookies
         found in config.
+        If you want to load default config, do it afterwards...
         """
         self.session = Session()
         # Init config:
         self.config = config if config is not None else {}
         self.config_filepath = config_filepath
-        if self.config_filepath:
+        if self.config_filepath or config == "default":
             self.load_config()
         # Inject headers in session:
         if self.config.get('ezclient_headers'):
@@ -123,15 +124,31 @@ class EzClient(object):
         if cookies:
             self.session.cookies.update(cookies)
         # EzProxy Login adaptor:
-        login_adaptor_name = config.get('ezclient_login_adaptor')
-        if login_adaptor_name:
-            self.login_adaptor = login_adaptors[login_adaptor_name]
-            self.login_hostname = login_domains[login_adaptor_name]
-        else:
+        self.login_adaptor = None
+        self.login_hostname = []
+        self.set_login_adaptor()
+        if self.config.get('ezclient_useragent'):
+            self.session.headers['User-Agent'] = self.config['ezclient_useragent']
+
+    def set_login_adaptor(self, login_adaptor_name=None, func=None, domain=None):
+        """
+        Set EzClient login adaptor function using either a function,
+        or one of the named adaptors in login_adaptors.
             self.login_adaptor = None
             self.login_hostname = []
-        if config.get('ezclient_useragent'):
-            self.session.headers['User-Agent'] = config['ezclient_useragent']
+        """
+        if func:
+            self.login_adaptor = func
+            self.login_hostname = domain
+            return
+        if login_adaptor_name is None:
+            login_adaptor_name = self.config.get('ezclient_login_adaptor')
+        if login_adaptor_name:
+            self.login_adaptor = login_adaptors[login_adaptor_name]
+            self.login_hostname = login_domains.get(login_adaptor_name)
+            logger.info("Using named login_adaptor '%s'", login_adaptor_name)
+        else:
+            logger.info("No login_adaptor given or specified in config...")
 
     @property
     def headers(self):
@@ -168,6 +185,7 @@ class EzClient(object):
         if filepath is None:
             filepath = self.config_filepath
         try:
+            # Filepath can be None; will load the hard-coded default config.
             config = load_config(filepath)
         except FileNotFoundError:
             logger.error("Could not load config from file: %s", filepath)
@@ -300,6 +318,7 @@ class EzClient(object):
 
 
 def test():
+    """ Test. """
     cfg = """
 proxy_login_adaptor: AU_lib
 proxy_url_fmt: https://{netloc}.ez.statsbiblioteket.dk:2048/{path}

@@ -28,10 +28,32 @@ import getpass
 import logging
 logger = logging.getLogger(__name__)
 #from urllib.parse import urljoin, urlsplit
-
+import hashlib
 
 LIBDIR = os.path.dirname(os.path.realpath(__file__))
 
+
+def filehexdigest(filepath, digesttype='md5'):
+    """
+    Returns hex digest of file in filepath.
+    Mostly for reference, since this is so short.
+    """
+    m = hashlib.new(digesttype) # generic; can also be e.g. hashlib.md5()
+    with open(filepath, 'rb') as fd:
+        # md5 sum default is 128 = 2**7-bytes digest block. However, file read is faster for e.g. 8 kb blocks.
+        # http://stackoverflow.com/questions/1131220/get-md5-hash-of-big-files-in-python
+        for chunk in iter(lambda: fd.read(128*m.block_size), b''):
+            m.update(chunk)
+    return m.hexdigest()
+
+def calc_checksum(bytearr, digesttype='md5'):
+    """
+    Calculate checksum of in-memory bytearray.
+    Mostly for reference, since this is so short.
+    """
+    m = hashlib.new(digesttype) # generic; can also be e.g. hashlib.md5()
+    m.update(bytearr)
+    return m.hexdigest()
 
 
 def credentials_prompt(user='', password=''):

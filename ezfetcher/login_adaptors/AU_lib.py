@@ -23,6 +23,7 @@ import requests
 from urllib.parse import urlparse, urljoin, parse_qsl
 from getpass import getpass
 import logging
+import pdb
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +81,10 @@ def submit_lib_credentials(s, url):
     # AuthState is same as the AuthState you get from url with
     params = dict(parse_qsl(urlparse(url).query))
     action_url = url.split('?')[0]
+    if not params:
+        print("URL for AU credentials submission does not contain any query params")
+        print("-- Complete url:", url)
+        pdb.set_trace()
     #
     formdata = get_au_lib_credentials()
     params.update(formdata)
@@ -126,7 +131,14 @@ def AU_lib_login(s, url, url_is_loginpage=None):
     # Submit library credentials:
     r = submit_lib_credentials(s, r.url)
     # After login, you have to transfer SAMLResponses. (Usually done by javascript in browser...)
-    r = parse_saml_response(s, r.text)
+    try:
+        r = parse_saml_response(s, r.text)
+    except AttributeError as e:
+        print("Error while trying to parse SAML response:", e)
+        print("Starting pdb...")
+        import pdb
+        pdb.set_trace()
+        parse_saml_response(s, r.text)
     r = parse_saml_2(s, r.text)
     # YEAH, r now has text from nature url !!
     # Andersen DNA box:
