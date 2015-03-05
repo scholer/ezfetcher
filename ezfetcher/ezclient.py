@@ -126,11 +126,13 @@ class EzClient(object):
         # EzProxy Login adaptor:
         self.login_adaptor = None
         self.login_hostname = []
+        self.login_config = {}
         self.set_login_adaptor()
+
         if self.config.get('ezclient_useragent'):
             self.session.headers['User-Agent'] = self.config['ezclient_useragent']
 
-    def set_login_adaptor(self, login_adaptor_name=None, func=None, domain=None):
+    def set_login_adaptor(self, login_adaptor_name=None, func=None, domain=None, config=None):
         """
         Set EzClient login adaptor function using either a function,
         or one of the named adaptors in login_adaptors.
@@ -140,12 +142,14 @@ class EzClient(object):
         if func:
             self.login_adaptor = func
             self.login_hostname = domain
+            self.login_config = config
             return
         if login_adaptor_name is None:
             login_adaptor_name = self.config.get('ezclient_login_adaptor')
         if login_adaptor_name:
             self.login_adaptor = login_adaptors[login_adaptor_name]
             self.login_hostname = login_domains.get(login_adaptor_name)
+            self.login_config = self.config.get('ezclient_login_config', {}).get(login_adaptor_name)
             logger.info("Using named login_adaptor '%s'", login_adaptor_name)
         else:
             logger.info("No login_adaptor given or specified in config...")
@@ -241,7 +245,9 @@ class EzClient(object):
         that you have already been forwarded to the login page
         (entry point where adaptor takes over).
         """
-        r = self.login_adaptor(self.session, response.url, url_is_loginpage)
+        r = self.login_adaptor(self.session, response.url, url_is_loginpage,
+                               r=response, config=self.login_config)
+        # Save cookies (unless config specifically says not to):
         if r and self.config.get('cookies_persist_after_login', True):
             self.save_cookies()
         return r

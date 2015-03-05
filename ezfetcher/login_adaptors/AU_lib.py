@@ -16,7 +16,7 @@
 ##    You should have received a copy of the GNU General Public License
 
 
-# pylint: disable=C0103,W0142,W0611,C0111
+# pylint: disable=C0103,W0142,W0611,C0111,C0301
 
 import re
 import requests
@@ -27,21 +27,7 @@ import pdb
 logger = logging.getLogger(__name__)
 
 
-
-def print_history(response, name):
-    #print("\n"+"-"*80+"\n")
-    print("\n")
-    #print(name, ":", response)
-    print(name+".history + ["+name+"]:", response.history + [response])
-    for i, res in enumerate(response.history + [response]):
-        parsed = urlparse(res.url)
-        print("- Hit %s: %s" % (i, "/".join((parsed.netloc, parsed.path))))
-        #url_pars = dict(parse_qsl(urlparse(res.url).query))
-        #print("--- status code: %s" % res.status_code)
-        #print("--- URL query param keys:", list(url_pars.keys()))
-        ##print("-- 'idp_https://' in any of the params:", any('idp_https://' in key for key in url_pars.keys()))
-        #print("--- headers (keys):", list(res.headers.keys()))
-        #print("--- cookies (keys):", list(res.cookies.keys()))
+from .adaptor_utils import print_history
 
 
 
@@ -66,30 +52,43 @@ def select_login_page(s, url, url_is_loginpage=True):
 
 ## IT WORKS, bitches!
 
-def get_au_lib_credentials(inputfields=None, header="AU Library login:"):
+def get_credentials(inputfields=None, header="AU Library login:", defaults=None):
+    if defaults is None:
+        defaults = {}
     if inputfields is None:
-        inputfields = (('username', 'CPR nummer', getpass),
-                       ('password', 'PIN', getpass))
+        inputfields = (('username', 'CPR nummer [%s]' % defaults.get('username', ''), getpass),
+                       ('password', 'PIN        [%s]' % defaults.get('password', ''), getpass))
     formdata = {}
     print(header)
     for field, description, prompt_func in inputfields:
-        formdata[field] = prompt_func("Please enter %s:  " % description)
+        formdata[field] = prompt_func("Please enter %s:  " % description) \
+                            or defaults.get(field, '')
+    if not all(formdata.values()):
+        header = "\nUsername or password is empty, please re-enter credentials"
+        return get_credentials(inputfields, header=header, defaults=formdata)
     return formdata
 
 
-def submit_lib_credentials(s, url):
-    # AuthState is same as the AuthState you get from url with
-    params = dict(parse_qsl(urlparse(url).query))
+def submit_lib_credentials(s, url, html=None, credentials=None):
+    # AuthState is same as the AuthState you get from url,
+    # so the initial formdata can be obtained simply with:
+    formdata = dict(parse_qsl(urlparse(url).query))
     action_url = url.split('?')[0]
-    if not params:
+    if not formdata:
         print("URL for AU credentials submission does not contain any query params")
         print("-- Complete url:", url)
         pdb.set_trace()
-    #
-    formdata = get_au_lib_credentials()
-    params.update(formdata)
+
+    # Obtain credentials and add it to the formdata:
+    if credentials is None or credentials.get("prompt") != "never":
+        credentials = get_credentials(defaults=credentials)
+    elif credentials.get("prompt") == "never":
+        credentials.pop("prompt")
+        print("Skipping login prompt; using credentials:",
+              ", ".join("%s: %s" % kv for kv in credentials.items()))
+    formdata.update(credentials)
     # <form name="loginform" id="loginform" action="?" method="post">
-    r3 = s.post(action_url, data=params)
+    r3 = s.post(action_url, data=formdata)
     print_history(r3, "r3")
     return r3
 
@@ -119,24 +118,35 @@ def parse_saml_2(s, html):
     return r
 
 
-def AU_lib_login(s, url, url_is_loginpage=None):
+def AU_lib_login(s, url, url_is_loginpage=None, html=None, r=None, config=None):
 
     if url is None:
         url = "http://ez.statsbiblioteket.dk:2048"
     if s is None:
         s = requests.Session()
 
+    if r:
+        url = r.url
+        html = r.text
+    if html is None or not url_is_loginpage:
+        #raise ValueError("HUID_login requires a HTML body to start of from.")
+        r = s.get(url)
+        url = r.url
+        html = r.text
+
+
     # Select login method:
     r = select_login_page(s, url, url_is_loginpage)
-    # Submit library credentials:
-    r = submit_lib_credentials(s, r.url)
-    # After login, you have to transfer SAMLResponses. (Usually done by javascript in browser...)
+
+    # Submit library credentials: , html=None, credentials=None
+    r = submit_lib_credentials(s, r.url, html=r.text, credentials=config)
+
+    # After AU lib login, you have to transfer SAMLResponses. (Usually done by javascript in browser...)
     try:
         r = parse_saml_response(s, r.text)
     except AttributeError as e:
         print("Error while trying to parse SAML response:", e)
         print("Starting pdb...")
-        import pdb
         pdb.set_trace()
         parse_saml_response(s, r.text)
     r = parse_saml_2(s, r.text)
