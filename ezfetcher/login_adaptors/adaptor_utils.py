@@ -19,6 +19,8 @@
 # pylint: disable=C0103,W0142,W0611,C0111
 
 
+from urllib.parse import urlparse, urljoin, parse_qsl
+
 
 def print_history(response, name):
     print("\n")

@@ -237,6 +237,9 @@ def fetch_pdf(url, config, ezclient=None, headers=None, cookies=None, r=None, me
     pdf_href_regex = config.get('pdf_href_regex')
     # Pass in existing response if you already have it:
     response = get_pdf_response(url, ezclient, pdf_href_regex, r=r)
+    if not response:
+        print("Failed to get pdf from url %s. get_pdf_response returned: %s" % (url, response))
+        return
 
     print("Response with content type:", response.headers['Content-Type'])
     # We have a pdf in our response:
