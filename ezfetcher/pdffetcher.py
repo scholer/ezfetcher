@@ -249,7 +249,7 @@ def fetch_pdf(url, config, ezclient=None, headers=None, cookies=None, r=None, me
         logger.info("config.get('pdf_download_dir'): %s", config.get('pdf_download_dir'))
         savedir = os.path.expanduser(config.get('pdf_download_dir', os.path.join('~', 'Downloads')))
         savedir = os.path.normpath(savedir)
-        # TODO: If filename already exists, do checksum calculation to detect identical file.
+        # Done: If filename already exists, do checksum calculation to detect identical file.
         filepath = save_file(response, savedir, overwrite=config.get('pdf_overwrite', 'check_digest'),
                              metadata=metadata)
         open_pdf = config.get('pdf_open_after_download')
